@@ -4,6 +4,7 @@ import com.salesapp.android.data.api.ApiClient;
 import com.salesapp.android.data.api.service.AuthService;
 import com.salesapp.android.data.model.response.AuthResponse;
 import com.salesapp.android.data.model.request.LoginRequest;
+import com.salesapp.android.data.model.request.LogoutRequest;
 import com.salesapp.android.data.model.request.SignupRequest;
 
 import retrofit2.Call;
@@ -70,6 +71,40 @@ public class AuthRepository {
                         callback.onError(errorResponse.getMessage());
                     } catch (Exception e) {
                         callback.onError("Registration failed: " + e.getMessage());
+                    }
+                }
+            }
+
+            @Override
+            public void onFailure(Call<AuthResponse> call, Throwable t) {
+                callback.onError("Network error: " + t.getMessage());
+            }
+        });
+    }
+
+    public void logout(String token, AuthCallback<AuthResponse> callback) {
+        LogoutRequest logoutRequest = new LogoutRequest(token);
+
+        // Use the authenticated client to ensure token is included in the headers
+        AuthService authServiceWithToken = ApiClient.getAuthClient(token).create(AuthService.class);
+        Call<AuthResponse> call = authServiceWithToken.logout(logoutRequest);
+
+        call.enqueue(new Callback<AuthResponse>() {
+            @Override
+            public void onResponse(Call<AuthResponse> call, Response<AuthResponse> response) {
+                if (response.isSuccessful()) {
+                    AuthResponse successResponse = new AuthResponse();
+                    successResponse.setMessage("Logout successful");
+                    callback.onSuccess(successResponse);
+                } else {
+                    try {
+                        // Try to get error message from server
+                        AuthResponse errorResponse = new AuthResponse();
+                        errorResponse.setMessage("Logout failed: " +
+                                (response.errorBody() != null ? response.errorBody().string() : "Unknown error"));
+                        callback.onError(errorResponse.getMessage());
+                    } catch (Exception e) {
+                        callback.onError("Logout failed: " + e.getMessage());
                     }
                 }
             }
