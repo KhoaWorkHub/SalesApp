@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SalesApp</string>
+    <string name="no_products_found">No products found. Click + to add a new product.</string>
 </resources>

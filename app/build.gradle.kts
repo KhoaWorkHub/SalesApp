@@ -69,6 +69,8 @@ dependencies {
     // Lottie for animations
     implementation("com.airbnb.android:lottie:6.3.0")
 
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
     // Testing
     testImplementation(libs.junit)
     androidTestImplementation(libs.ext.junit)

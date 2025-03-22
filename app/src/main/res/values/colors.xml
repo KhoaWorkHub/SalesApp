@@ -2,4 +2,19 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Add these colors for the SwipeRefreshLayout -->
+    <color name="colorPrimary">#3F51B5</color>
+    <color name="colorPrimaryDark">#303F9F</color>
+    <color name="colorAccent">#FF4081</color>
+
+    <!-- Additional colors for your app -->
+    <color name="colorBackground">#F5F5F5</color>
+    <color name="colorError">#D32F2F</color>
+    <color name="colorSuccess">#388E3C</color>
+    <color name="colorWarning">#FFA000</color>
+    <color name="colorInfo">#1976D2</color>
+    <color name="colorTextPrimary">#212121</color>
+    <color name="colorTextSecondary">#757575</color>
+    <color name="colorDivider">#BDBDBD</color>
 </resources>
