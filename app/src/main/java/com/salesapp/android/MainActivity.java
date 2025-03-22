@@ -23,6 +23,7 @@ import com.salesapp.android.data.preference.PreferenceManager;
 import com.salesapp.android.data.repository.AuthRepository;
 import com.salesapp.android.ui.auth.LoginActivity;
 import com.salesapp.android.ui.product.ProductsFragment;
+import com.salesapp.android.ui.product.admin.AdminProductManagementFragment;
 
 public class MainActivity extends AppCompatActivity {
     private PreferenceManager preferenceManager;
@@ -95,27 +96,56 @@ public class MainActivity extends AppCompatActivity {
         transaction.commit();
     }
 
+// Update your showProfileOptions method in MainActivity.java
+
     private void showProfileOptions() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         View dialogView = getLayoutInflater().inflate(R.layout.dialog_profile_options, null);
         builder.setView(dialogView);
 
+        // Create the dialog first so you can reference it in the click listeners
+        final AlertDialog dialog = builder.create();
+
         // Set user info
         TextView textViewUsername = dialogView.findViewById(R.id.textViewUsername);
         TextView textViewEmail = dialogView.findViewById(R.id.textViewEmail);
         Button buttonLogout = dialogView.findViewById(R.id.buttonLogout);
+        Button buttonAdminPanel = dialogView.findViewById(R.id.buttonAdminPanel);
 
         textViewUsername.setText(preferenceManager.getUsername());
         textViewEmail.setText(preferenceManager.getEmail());
 
-        AlertDialog dialog = builder.create();
-        dialog.show();
+        // Show admin panel button only if user is admin
+        if (isAdmin()) {
+            buttonAdminPanel.setVisibility(View.VISIBLE);
+            buttonAdminPanel.setOnClickListener(v -> {
+                dialog.dismiss();
+                try {
+                    // Navigate to the admin product management screen
+                    AdminProductManagementFragment fragment = new AdminProductManagementFragment();
+                    loadFragment(fragment);
+                } catch (Exception e) {
+                    Toast.makeText(MainActivity.this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    e.printStackTrace();
+                }
+            });
+        } else {
+            buttonAdminPanel.setVisibility(View.GONE);
+        }
 
         // Set logout click listener
         buttonLogout.setOnClickListener(v -> {
             dialog.dismiss();
             showLogoutConfirmationDialog();
         });
+
+        // Show the dialog after setting up all click listeners
+        dialog.show();
+    }
+
+    private boolean isAdmin() {
+        String role = preferenceManager.getRole();
+        return role != null && role.equals("ADMIN");
     }
 
     private void showLogoutConfirmationDialog() {

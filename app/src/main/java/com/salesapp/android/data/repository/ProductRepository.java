@@ -1,33 +1,37 @@
 package com.salesapp.android.data.repository;
 
 import com.salesapp.android.data.api.ApiClient;
-import com.salesapp.android.data.api.ApiService;
+import com.salesapp.android.data.api.service.ProductService;
+import com.salesapp.android.data.callback.ProductCallback;
 import com.salesapp.android.data.model.Category;
 import com.salesapp.android.data.model.Product;
+import com.salesapp.android.data.model.request.ProductRequest;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
 public class ProductRepository {
-    private ApiService apiService;
+    private ProductService apiService;
+    private final String token;
 
     public ProductRepository(String token) {
+        this.token = token;
         // Use authenticated client if token is provided
         if (token != null && !token.isEmpty()) {
-            apiService = ApiClient.getAuthClient(token).create(ApiService.class);
+            apiService = ApiClient.getAuthClient(token).create(ProductService.class);
         } else {
-            apiService = ApiClient.getClient().create(ApiService.class);
+            apiService = ApiClient.getClient().create(ProductService.class);
         }
     }
 
-    public interface ProductCallback<T> {
-        void onSuccess(T result);
-        void onError(String message);
-    }
-
+    /**
+     * Get all products
+     */
     public void getAllProducts(ProductCallback<List<Product>> callback) {
         Call<List<Product>> call = apiService.getAllProducts();
         call.enqueue(new Callback<List<Product>>() {
@@ -47,6 +51,9 @@ public class ProductRepository {
         });
     }
 
+    /**
+     * Get product by ID
+     */
     public void getProductById(long productId, ProductCallback<Product> callback) {
         Call<Product> call = apiService.getProductById(productId);
         call.enqueue(new Callback<Product>() {
@@ -66,6 +73,9 @@ public class ProductRepository {
         });
     }
 
+    /**
+     * Get products by category
+     */
     public void getProductsByCategory(long categoryId, ProductCallback<List<Product>> callback) {
         Call<List<Product>> call = apiService.getProductsByCategoryId(categoryId);
         call.enqueue(new Callback<List<Product>>() {
@@ -85,6 +95,9 @@ public class ProductRepository {
         });
     }
 
+    /**
+     * Search products by name
+     */
     public void searchProducts(String query, ProductCallback<List<Product>> callback) {
         Call<List<Product>> call = apiService.searchProducts(query);
         call.enqueue(new Callback<List<Product>>() {
@@ -104,6 +117,108 @@ public class ProductRepository {
         });
     }
 
+    /**
+     * Create a new product (Admin only)
+     */
+    public void createProduct(ProductRequest productRequest, ProductCallback<Product> callback) {
+        // Ensure we use the authenticated client for admin operations
+        ProductService adminApiService = ApiClient.getAuthClient(token).create(ProductService.class);
+
+        Call<Product> call = adminApiService.createProduct(productRequest);
+        call.enqueue(new Callback<Product>() {
+            @Override
+            public void onResponse(Call<Product> call, Response<Product> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    callback.onSuccess(response.body());
+                } else {
+                    String errorBody = "";
+                    try {
+                        if (response.errorBody() != null) {
+                            errorBody = response.errorBody().string();
+                        }
+                    } catch (Exception e) {
+                        errorBody = "Could not parse error response";
+                    }
+                    callback.onError("Failed to create product: " + errorBody);
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Product> call, Throwable t) {
+                callback.onError("Network error: " + t.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Update an existing product (Admin only)
+     */
+    public void updateProduct(long productId, ProductRequest productRequest, ProductCallback<Product> callback) {
+        // Ensure we use the authenticated client for admin operations
+        ProductService adminApiService = ApiClient.getAuthClient(token).create(ProductService.class);
+
+        Call<Product> call = adminApiService.updateProduct(productId, productRequest);
+        call.enqueue(new Callback<Product>() {
+            @Override
+            public void onResponse(Call<Product> call, Response<Product> response) {
+                if (response.isSuccessful() && response.body() != null) {
+                    callback.onSuccess(response.body());
+                } else {
+                    String errorBody = "";
+                    try {
+                        if (response.errorBody() != null) {
+                            errorBody = response.errorBody().string();
+                        }
+                    } catch (Exception e) {
+                        errorBody = "Could not parse error response";
+                    }
+                    callback.onError("Failed to update product: " + errorBody);
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Product> call, Throwable t) {
+                callback.onError("Network error: " + t.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Delete a product (Admin only)
+     */
+    public void deleteProduct(long productId, ProductCallback<String> callback) {
+        // Ensure we use the authenticated client for admin operations
+        ProductService adminApiService = ApiClient.getAuthClient(token).create(ProductService.class);
+
+        Call<Void> call = adminApiService.deleteProduct(productId);
+        call.enqueue(new Callback<Void>() {
+            @Override
+            public void onResponse(Call<Void> call, Response<Void> response) {
+                if (response.isSuccessful()) {
+                    callback.onSuccess("Product deleted successfully");
+                } else {
+                    String errorBody = "";
+                    try {
+                        if (response.errorBody() != null) {
+                            errorBody = response.errorBody().string();
+                        }
+                    } catch (Exception e) {
+                        errorBody = "Could not parse error response";
+                    }
+                    callback.onError("Failed to delete product: " + errorBody);
+                }
+            }
+
+            @Override
+            public void onFailure(Call<Void> call, Throwable t) {
+                callback.onError("Network error: " + t.getMessage());
+            }
+        });
+    }
+
+    /**
+     * Get all categories
+     */
     public void getAllCategories(ProductCallback<List<Category>> callback) {
         Call<List<Category>> call = apiService.getAllCategories();
         call.enqueue(new Callback<List<Category>>() {
@@ -121,5 +236,54 @@ public class ProductRepository {
                 callback.onError("Network error: " + t.getMessage());
             }
         });
+    }
+
+    /**
+     * Filter products based on criteria (local filtering - not API)
+     */
+    public List<Product> filterProducts(List<Product> products, String query, Long categoryId,
+                                        double minPrice, double maxPrice) {
+        if (products == null) {
+            return new ArrayList<>();
+        }
+
+        return products.stream()
+                .filter(product -> {
+                    // Filter by search query
+                    boolean matchesQuery = query == null || query.isEmpty() ||
+                            (product.getProductName() != null &&
+                                    product.getProductName().toLowerCase().contains(query.toLowerCase())) ||
+                            (product.getBriefDescription() != null &&
+                                    product.getBriefDescription().toLowerCase().contains(query.toLowerCase()));
+
+                    // Filter by category
+                    boolean matchesCategory = categoryId == null ||
+                            (product.getCategory() != null &&
+                                    product.getCategory().getCategoryId().equals(categoryId));
+
+                    // Filter by price
+                    boolean matchesPrice = product.getPrice() >= minPrice &&
+                            product.getPrice() <= maxPrice;
+
+                    return matchesQuery && matchesCategory && matchesPrice;
+                })
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Sort products by price (local sorting - not API)
+     */
+    public List<Product> sortProductsByPrice(List<Product> products, boolean ascending) {
+        if (products == null) {
+            return new ArrayList<>();
+        }
+
+        List<Product> sortedList = new ArrayList<>(products);
+        if (ascending) {
+            sortedList.sort((p1, p2) -> Double.compare(p1.getPrice(), p2.getPrice()));
+        } else {
+            sortedList.sort((p1, p2) -> Double.compare(p2.getPrice(), p1.getPrice()));
+        }
+        return sortedList;
     }
 }

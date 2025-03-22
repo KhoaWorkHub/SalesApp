@@ -87,6 +87,18 @@
         app:layout_constraintTop_toBottomOf="@id/buttonProfile" />
 
     <Button
+        android:id="@+id/buttonAdminPanel"
+        style="@style/Widget.MaterialComponents.Button.TextButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="start|center_vertical"
+        android:text="Admin Panel"
+        android:textAllCaps="false"
+        app:icon="@android:drawable/ic_menu_manage"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/buttonOrders" />
+
+    <Button
         android:id="@+id/buttonLogout"
         style="@style/Widget.MaterialComponents.Button.TextButton"
         android:layout_width="match_parent"
@@ -97,6 +109,6 @@
         android:textColor="@android:color/holo_red_dark"
         app:icon="@android:drawable/ic_lock_power_off"
         app:iconTint="@android:color/holo_red_dark"
-        app:layout_constraintTop_toBottomOf="@id/buttonOrders" />
+        app:layout_constraintTop_toBottomOf="@id/buttonAdminPanel" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>
