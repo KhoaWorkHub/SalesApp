@@ -1,5 +1,7 @@
 package com.salesapp.android.data.repository;
 
+import android.util.Log;
+
 import com.salesapp.android.data.api.ApiClient;
 import com.salesapp.android.data.api.service.ProductService;
 import com.salesapp.android.data.callback.ProductCallback;
@@ -7,6 +9,7 @@ import com.salesapp.android.data.model.Category;
 import com.salesapp.android.data.model.Product;
 import com.salesapp.android.data.model.request.ProductRequest;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,18 +37,36 @@ public class ProductRepository {
      */
     public void getAllProducts(ProductCallback<List<Product>> callback) {
         Call<List<Product>> call = apiService.getAllProducts();
+
+        // Add logging to see request details
+        Log.d("ProductRepository", "Calling getAllProducts with URL: " + call.request().url());
+        Log.d("ProductRepository", "Using token: " + (token != null ? "Yes" : "No"));
+
         call.enqueue(new Callback<List<Product>>() {
             @Override
             public void onResponse(Call<List<Product>> call, Response<List<Product>> response) {
+                Log.d("ProductRepository", "getAllProducts response code: " + response.code());
+
                 if (response.isSuccessful() && response.body() != null) {
+                    Log.d("ProductRepository", "getAllProducts success, received " + response.body().size() + " products");
                     callback.onSuccess(response.body());
                 } else {
-                    callback.onError("Failed to fetch products: " + response.message());
+                    String errorBody = "";
+                    try {
+                        if (response.errorBody() != null) {
+                            errorBody = response.errorBody().string();
+                        }
+                    } catch (IOException e) {
+                        errorBody = "Could not read error body";
+                    }
+                    Log.e("ProductRepository", "getAllProducts failed: " + response.message() + " - " + errorBody);
+                    callback.onError("Failed to fetch products: " + response.message() + " - " + errorBody);
                 }
             }
 
             @Override
             public void onFailure(Call<List<Product>> call, Throwable t) {
+                Log.e("ProductRepository", "getAllProducts network error: " + t.getMessage(), t);
                 callback.onError("Network error: " + t.getMessage());
             }
         });
@@ -243,11 +264,26 @@ public class ProductRepository {
      */
     public List<Product> filterProducts(List<Product> products, String query, Long categoryId,
                                         double minPrice, double maxPrice) {
+        Log.d("ProductRepository", "Filtering products - input size: " +
+                (products != null ? products.size() : 0));
+        Log.d("ProductRepository", "Filter params - query: '" + query +
+                "', categoryId: " + categoryId +
+                ", price range: " + minPrice + "-" + maxPrice);
+
         if (products == null) {
             return new ArrayList<>();
         }
 
-        return products.stream()
+        // Debug the products we're trying to filter
+        for (Product product : products) {
+            Log.d("ProductRepository", "Product before filtering: " +
+                    product.getProductId() + " - " +
+                    product.getProductName() + ", price: " +
+                    product.getPrice() + ", category: " +
+                    (product.getCategory() != null ? product.getCategory().getCategoryId() : "null"));
+        }
+
+        List<Product> filtered = products.stream()
                 .filter(product -> {
                     // Filter by search query
                     boolean matchesQuery = query == null || query.isEmpty() ||
@@ -265,9 +301,20 @@ public class ProductRepository {
                     boolean matchesPrice = product.getPrice() >= minPrice &&
                             product.getPrice() <= maxPrice;
 
+                    // Log why a product might be filtered out
+                    if (!matchesQuery || !matchesCategory || !matchesPrice) {
+                        Log.d("ProductRepository", "Product filtered out: " + product.getProductName() +
+                                " - matchesQuery: " + matchesQuery +
+                                ", matchesCategory: " + matchesCategory +
+                                ", matchesPrice: " + matchesPrice);
+                    }
+
                     return matchesQuery && matchesCategory && matchesPrice;
                 })
                 .collect(Collectors.toList());
+
+        Log.d("ProductRepository", "Filtering result: " + filtered.size() + " products");
+        return filtered;
     }
 
     /**

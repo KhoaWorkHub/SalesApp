@@ -53,15 +53,12 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="16dp"
-                        android:valueFrom="0"
-                        android:valueTo="10000"
                         app:labelBehavior="visible"
                         app:thumbColor="@android:color/holo_blue_dark"
                         app:thumbRadius="8dp"
                         app:trackColorActive="@android:color/holo_blue_light"
                         app:trackColorInactive="#DDDDDD"
-                        app:trackHeight="4dp"
-                        app:values="@array/initial_slider_values" />
+                        app:trackHeight="4dp" />
 
                     <LinearLayout
                         android:layout_width="match_parent"
