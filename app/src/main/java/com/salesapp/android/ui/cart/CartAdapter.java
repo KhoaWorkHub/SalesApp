@@ -14,20 +14,20 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.bumptech.glide.Glide;
 import com.salesapp.android.R;
-import com.salesapp.android.data.model.CartItem;
+import com.salesapp.android.ui.cart.CartFragment.CartItemResponseWrapper;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder> {
-    private List<CartItem> cartItems = new ArrayList<>();
+    private List<CartItemResponseWrapper> cartItems = new ArrayList<>();
     private final Context context;
     private final CartItemListener listener;
 
     public interface CartItemListener {
-        void onRemoveItem(CartItem cartItem);
-        void onUpdateQuantity(CartItem cartItem, int newQuantity);
+        void onRemoveItem(CartItemResponseWrapper cartItem);
+        void onUpdateQuantity(CartItemResponseWrapper cartItem, int newQuantity);
     }
 
     public CartAdapter(Context context, CartItemListener listener) {
@@ -44,7 +44,7 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder
 
     @Override
     public void onBindViewHolder(@NonNull CartViewHolder holder, int position) {
-        CartItem cartItem = cartItems.get(position);
+        CartItemResponseWrapper cartItem = cartItems.get(position);
         holder.bind(cartItem);
     }
 
@@ -53,19 +53,19 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder
         return cartItems.size();
     }
 
-    public void setCartItems(List<CartItem> cartItems) {
+    public void setCartItems(List<CartItemResponseWrapper> cartItems) {
         this.cartItems = cartItems;
         notifyDataSetChanged();
     }
 
-    public List<CartItem> getCartItems() {
+    public List<CartItemResponseWrapper> getCartItems() {
         return cartItems;
     }
 
     public double calculateTotal() {
         double total = 0;
-        for (CartItem item : cartItems) {
-            total += item.getPrice() * item.getQuantity();
+        for (CartItemResponseWrapper item : cartItems) {
+            total += item.getSubtotal();
         }
         return total;
     }
@@ -92,27 +92,29 @@ public class CartAdapter extends RecyclerView.Adapter<CartAdapter.CartViewHolder
             buttonRemove = itemView.findViewById(R.id.buttonRemove);
         }
 
-        public void bind(CartItem cartItem) {
-            if (cartItem.getProduct() != null) {
-                textViewProductName.setText(cartItem.getProduct().getProductName());
-                textViewProductPrice.setText(String.format(Locale.getDefault(), "$%.2f", cartItem.getProduct().getPrice()));
+        public void bind(CartItemResponseWrapper cartItem) {
+            // Set product name
+            textViewProductName.setText(cartItem.getProductName());
 
-                // Load product image
-                if (cartItem.getProduct().getImageURL() != null && !cartItem.getProduct().getImageURL().isEmpty()) {
-                    Glide.with(context)
-                            .load(cartItem.getProduct().getImageURL())
-                            .placeholder(R.drawable.ic_launcher_background)
-                            .error(R.drawable.ic_launcher_background)
-                            .into(imageViewProduct);
-                } else {
-                    imageViewProduct.setImageResource(R.drawable.ic_launcher_background);
-                }
+            // Set product price
+            textViewProductPrice.setText(String.format(Locale.getDefault(), "$%.2f", cartItem.getPrice()));
+
+            // Load product image
+            if (cartItem.getImageURL() != null && !cartItem.getImageURL().isEmpty()) {
+                Glide.with(context)
+                        .load(cartItem.getImageURL())
+                        .placeholder(R.drawable.ic_launcher_background)
+                        .error(R.drawable.ic_launcher_background)
+                        .into(imageViewProduct);
+            } else {
+                imageViewProduct.setImageResource(R.drawable.ic_launcher_background);
             }
 
             // Set quantity and calculate item total
             textViewQuantity.setText(String.valueOf(cartItem.getQuantity()));
-            double itemTotal = cartItem.getQuantity() * cartItem.getPrice();
-            textViewItemTotal.setText(String.format(Locale.getDefault(), "Total: $%.2f", itemTotal));
+
+            // Set subtotal
+            textViewItemTotal.setText(String.format(Locale.getDefault(), "Total: $%.2f", cartItem.getSubtotal()));
 
             // Set click listeners
             buttonDecrease.setOnClickListener(v -> {

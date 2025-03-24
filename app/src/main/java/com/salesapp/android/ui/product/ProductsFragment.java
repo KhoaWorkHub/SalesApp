@@ -34,6 +34,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.airbnb.lottie.LottieAnimationView;
 import com.bumptech.glide.Glide;
+import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -46,10 +47,12 @@ import com.salesapp.android.R;
 import com.salesapp.android.data.model.CartItem;
 import com.salesapp.android.data.model.Category;
 import com.salesapp.android.data.model.Product;
+import com.salesapp.android.data.model.response.CartResponse;
 import com.salesapp.android.data.preference.PreferenceManager;
 import com.salesapp.android.data.repository.CartRepository;
 import com.salesapp.android.data.service.ProductService;
 import com.salesapp.android.ui.cart.CartFragment;
+import com.salesapp.android.utils.BadgeUtils;
 
 import java.text.NumberFormat;
 import java.util.ArrayList;
@@ -436,10 +439,13 @@ public class ProductsFragment extends Fragment implements ProductAdapter.OnProdu
         // Add to cart animation
         animateAddToCart(product);
 
+        // Get CartRepository with auth token
+        CartRepository cartRepository = new CartRepository(preferenceManager.getToken());
+
         // Actual add to cart logic
-        cartRepository.addItemToCart(product.getProductId(), 1, new CartRepository.CartCallback<CartItem>() {
+        cartRepository.addItemToCart(product.getProductId(), 1, new CartRepository.CartCallback<CartResponse>() {
             @Override
-            public void onSuccess(CartItem result) {
+            public void onSuccess(CartResponse result) {
                 Snackbar.make(requireView(), product.getProductName() + " added to cart", Snackbar.LENGTH_SHORT)
                         .setAction("View Cart", v -> {
                             // Navigate to cart fragment
@@ -452,6 +458,14 @@ public class ProductsFragment extends Fragment implements ProductAdapter.OnProdu
                             }
                         })
                         .show();
+
+                // Update cart badge
+                if (getActivity() != null) {
+                    BottomNavigationView bottomNavigationView = getActivity().findViewById(R.id.bottomNavigationView);
+                    if (bottomNavigationView != null) {
+                        BadgeUtils.updateCartBadge(requireContext(), bottomNavigationView);
+                    }
+                }
             }
 
             @Override

@@ -1,6 +1,7 @@
 package com.salesapp.android.ui.cart;
 
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -11,6 +12,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -21,15 +23,21 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.card.MaterialCardView;
 import com.salesapp.android.R;
-import com.salesapp.android.data.model.Cart;
-import com.salesapp.android.data.model.CartItem;
+import com.salesapp.android.data.model.response.CartResponse;
+import com.salesapp.android.data.model.response.CartItemResponse;
 import com.salesapp.android.data.preference.PreferenceManager;
 import com.salesapp.android.data.repository.CartRepository;
+import com.salesapp.android.utils.BadgeUtils;
 
+import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 public class CartFragment extends Fragment implements CartAdapter.CartItemListener {
+    private static final String TAG = "CartFragment";
+
     private RecyclerView recyclerViewCart;
     private CartAdapter cartAdapter;
     private ProgressBar progressBar;
@@ -42,7 +50,7 @@ public class CartFragment extends Fragment implements CartAdapter.CartItemListen
 
     private CartRepository cartRepository;
     private PreferenceManager preferenceManager;
-    private Cart currentCart;
+    private CartResponse currentCart;
 
     @Nullable
     @Override
@@ -95,18 +103,18 @@ public class CartFragment extends Fragment implements CartAdapter.CartItemListen
     private void loadCart() {
         showLoading(true);
 
-        cartRepository.getActiveCart(new CartRepository.CartCallback<Cart>() {
+        cartRepository.getCart(new CartRepository.CartCallback<CartResponse>() {
             @Override
-            public void onSuccess(Cart result) {
+            public void onSuccess(CartResponse result) {
                 showLoading(false);
                 currentCart = result;
 
-                if (result.getCartItems() == null || result.getCartItems().isEmpty()) {
+                if (result.getItems() == null || result.getItems().isEmpty()) {
                     showEmptyCart(true);
                 } else {
                     showEmptyCart(false);
-                    cartAdapter.setCartItems(result.getCartItems());
-                    updateOrderSummary();
+                    updateCartAdapter(result.getItems());
+                    updateOrderSummary(result.getTotalPrice());
                 }
 
                 // Update cart badge
@@ -118,17 +126,30 @@ public class CartFragment extends Fragment implements CartAdapter.CartItemListen
                 showLoading(false);
                 showEmptyCart(true);
                 Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Error loading cart: " + message);
             }
         });
     }
 
-    private void updateOrderSummary() {
-        double total = cartAdapter.calculateTotal();
+    private void updateCartAdapter(List<CartItemResponse> items) {
+        // Convert CartItemResponse to CartItem for adapter
+        List<CartItemResponseWrapper> wrappers = new ArrayList<>();
+
+        for (CartItemResponse item : items) {
+            wrappers.add(new CartItemResponseWrapper(item));
+        }
+
+        cartAdapter.setCartItems(wrappers);
+    }
+
+    private void updateOrderSummary(BigDecimal totalPrice) {
+        NumberFormat currencyFormat = NumberFormat.getCurrencyInstance();
+        String formattedTotal = currencyFormat.format(totalPrice);
 
         // Update summary views
-        textViewSubtotal.setText(String.format(Locale.getDefault(), "$%.2f", total));
-        textViewTotal.setText(String.format(Locale.getDefault(), "$%.2f", total));
-        textViewCheckoutTotal.setText(String.format(Locale.getDefault(), "$%.2f", total));
+        textViewSubtotal.setText(formattedTotal);
+        textViewTotal.setText(formattedTotal);
+        textViewCheckoutTotal.setText(formattedTotal);
     }
 
     private void showLoading(boolean show) {
@@ -149,32 +170,60 @@ public class CartFragment extends Fragment implements CartAdapter.CartItemListen
         if (getActivity() != null) {
             BottomNavigationView bottomNavigationView = getActivity().findViewById(R.id.bottomNavigationView);
             if (bottomNavigationView != null) {
-                com.salesapp.android.utils.BadgeUtils.updateCartBadge(requireContext(), bottomNavigationView);
+                BadgeUtils.updateCartBadge(requireContext(), bottomNavigationView);
             }
         }
     }
 
     @Override
-    public void onRemoveItem(CartItem cartItem) {
-        if (cartItem.getCartItemId() != null) {
+    public void onRemoveItem(CartItemResponseWrapper item) {
+        if (item.getCartItemId() != null) {
+            new MaterialAlertDialogBuilder(requireContext())
+                    .setTitle("Remove Item")
+                    .setMessage("Are you sure you want to remove this item from your cart?")
+                    .setPositiveButton("Remove", (dialog, which) -> {
+                        showLoading(true);
+                        cartRepository.removeCartItem(item.getCartItemId(), new CartRepository.CartCallback<CartResponse>() {
+                            @Override
+                            public void onSuccess(CartResponse result) {
+                                showLoading(false);
+                                Toast.makeText(requireContext(), "Item removed from cart", Toast.LENGTH_SHORT).show();
+
+                                if (result.getItems() == null || result.getItems().isEmpty()) {
+                                    showEmptyCart(true);
+                                } else {
+                                    updateCartAdapter(result.getItems());
+                                    updateOrderSummary(result.getTotalPrice());
+                                }
+
+                                // Update cart badge
+                                updateCartBadge();
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                showLoading(false);
+                                Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                                Log.e(TAG, "Error removing item: " + message);
+                            }
+                        });
+                    })
+                    .setNegativeButton("Cancel", null)
+                    .show();
+        }
+    }
+
+    @Override
+    public void onUpdateQuantity(CartItemResponseWrapper item, int newQuantity) {
+        if (item.getCartItemId() != null) {
             showLoading(true);
 
-            cartRepository.deleteCartItem(cartItem.getCartItemId(), new CartRepository.CartCallback<String>() {
+            cartRepository.updateCartItem(item.getCartItemId(), newQuantity, new CartRepository.CartCallback<CartResponse>() {
                 @Override
-                public void onSuccess(String result) {
+                public void onSuccess(CartResponse result) {
                     showLoading(false);
-                    Toast.makeText(requireContext(), result, Toast.LENGTH_SHORT).show();
-
-                    // Remove item from adapter
-                    ArrayList<CartItem> updatedItems = new ArrayList<>(cartAdapter.getCartItems());
-                    updatedItems.remove(cartItem);
-
-                    if (updatedItems.isEmpty()) {
-                        showEmptyCart(true);
-                    } else {
-                        cartAdapter.setCartItems(updatedItems);
-                        updateOrderSummary();
-                    }
+                    updateCartAdapter(result.getItems());
+                    updateOrderSummary(result.getTotalPrice());
 
                     // Update cart badge
                     updateCartBadge();
@@ -184,43 +233,48 @@ public class CartFragment extends Fragment implements CartAdapter.CartItemListen
                 public void onError(String message) {
                     showLoading(false);
                     Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
+                    Log.e(TAG, "Error updating quantity: " + message);
                 }
             });
         }
     }
 
-    @Override
-    public void onUpdateQuantity(CartItem cartItem, int newQuantity) {
-        if (cartItem.getCartItemId() != null) {
-            showLoading(true);
+    /**
+     * Wrapper class to adapt CartItemResponse to the CartAdapter interface
+     */
+    public static class CartItemResponseWrapper {
+        private CartItemResponse response;
 
-            cartRepository.updateCartItem(cartItem.getCartItemId(), newQuantity, new CartRepository.CartCallback<CartItem>() {
-                @Override
-                public void onSuccess(CartItem result) {
-                    showLoading(false);
+        public CartItemResponseWrapper(CartItemResponse response) {
+            this.response = response;
+        }
 
-                    // Update item in adapter
-                    ArrayList<CartItem> updatedItems = new ArrayList<>(cartAdapter.getCartItems());
-                    for (int i = 0; i < updatedItems.size(); i++) {
-                        if (updatedItems.get(i).getCartItemId().equals(result.getCartItemId())) {
-                            updatedItems.set(i, result);
-                            break;
-                        }
-                    }
+        public Long getCartItemId() {
+            return response.getCartItemId();
+        }
 
-                    cartAdapter.setCartItems(updatedItems);
-                    updateOrderSummary();
+        public Long getProductId() {
+            return response.getProductId();
+        }
 
-                    // Update cart badge
-                    updateCartBadge();
-                }
+        public String getProductName() {
+            return response.getProductName();
+        }
 
-                @Override
-                public void onError(String message) {
-                    showLoading(false);
-                    Toast.makeText(requireContext(), message, Toast.LENGTH_SHORT).show();
-                }
-            });
+        public String getImageURL() {
+            return response.getProductImage();
+        }
+
+        public double getPrice() {
+            return response.getPrice().doubleValue();
+        }
+
+        public int getQuantity() {
+            return response.getQuantity();
+        }
+
+        public double getSubtotal() {
+            return response.getSubtotal().doubleValue();
         }
     }
 }

@@ -2,15 +2,13 @@ package com.salesapp.android.utils;
 
 import android.content.Context;
 import android.view.MenuItem;
-import android.view.View;
 
 import androidx.annotation.NonNull;
 
 import com.google.android.material.badge.BadgeDrawable;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.salesapp.android.R;
-import com.salesapp.android.data.model.Cart;
-import com.salesapp.android.data.model.CartItem;
+import com.salesapp.android.data.model.response.CartResponse;
 import com.salesapp.android.data.preference.PreferenceManager;
 import com.salesapp.android.data.repository.CartRepository;
 
@@ -31,16 +29,13 @@ public class BadgeUtils {
         // Create cart repository
         CartRepository cartRepository = new CartRepository(token);
 
-        // Get active cart
-        cartRepository.getActiveCart(new CartRepository.CartCallback<Cart>() {
+        // Get cart
+        cartRepository.getCart(new CartRepository.CartCallback<CartResponse>() {
             @Override
-            public void onSuccess(Cart result) {
-                if (result != null && result.getCartItems() != null && !result.getCartItems().isEmpty()) {
+            public void onSuccess(CartResponse result) {
+                if (result != null && result.getItems() != null && !result.getItems().isEmpty()) {
                     // Calculate total items in cart
-                    int itemCount = 0;
-                    for (CartItem item : result.getCartItems()) {
-                        itemCount += item.getQuantity();
-                    }
+                    int itemCount = result.getTotalItemsCount();
 
                     // Update badge
                     if (itemCount > 0) {
