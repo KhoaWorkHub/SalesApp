@@ -7,17 +7,24 @@ public class StoreLocation implements Serializable {
     private double latitude;
     private double longitude;
     private String address;
+    private String name;
+    private String phone;
+    private String openingHours;
 
     // No-arg constructor for Gson
     public StoreLocation() {
     }
 
     // Constructor with all fields
-    public StoreLocation(Long locationId, double latitude, double longitude, String address) {
+    public StoreLocation(Long locationId, double latitude, double longitude, String address,
+                         String name, String phone, String openingHours) {
         this.locationId = locationId;
         this.latitude = latitude;
         this.longitude = longitude;
         this.address = address;
+        this.name = name;
+        this.phone = phone;
+        this.openingHours = openingHours;
     }
 
     // Getters and Setters
@@ -51,5 +58,29 @@ public class StoreLocation implements Serializable {
 
     public void setAddress(String address) {
         this.address = address;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getOpeningHours() {
+        return openingHours;
+    }
+
+    public void setOpeningHours(String openingHours) {
+        this.openingHours = openingHours;
     }
 }
