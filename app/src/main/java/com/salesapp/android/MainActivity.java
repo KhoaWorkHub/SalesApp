@@ -2,6 +2,7 @@ package com.salesapp.android;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.TextView;
@@ -30,6 +31,7 @@ public class MainActivity extends AppCompatActivity {
     private AuthRepository authRepository;
     private BottomNavigationView bottomNavigationView;
 
+    // In MainActivity.java - modify the onCreate method
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -71,6 +73,10 @@ public class MainActivity extends AppCompatActivity {
 
         // Set default fragment
         if (savedInstanceState == null) {
+            // Log that we're loading the default fragment
+            Log.d("MainActivity", "Loading default fragment (ProductsFragment)");
+            loadFragment(new ProductsFragment());
+            // Select the home item in the bottom navigation
             bottomNavigationView.setSelectedItemId(R.id.nav_home);
         }
 

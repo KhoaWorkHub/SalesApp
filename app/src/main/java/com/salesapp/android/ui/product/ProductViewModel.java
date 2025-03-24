@@ -1,5 +1,7 @@
 package com.salesapp.android.ui.product;
 
+import android.util.Log;
+
 import androidx.lifecycle.LiveData;
 import androidx.lifecycle.MutableLiveData;
 import androidx.lifecycle.ViewModel;
@@ -12,6 +14,7 @@ import com.salesapp.android.data.service.ProductService;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * ViewModel for managing product-related UI state
@@ -28,6 +31,10 @@ public class ProductViewModel extends ViewModel {
     private final MutableLiveData<List<Category>> categories = new MutableLiveData<>(new ArrayList<>());
     private final MutableLiveData<Category> selectedCategory = new MutableLiveData<>();
 
+    // LiveData for dynamic price range
+    private final MutableLiveData<Double> minimumProductPrice = new MutableLiveData<>(0.0);
+    private final MutableLiveData<Double> maximumProductPrice = new MutableLiveData<>(100000.0);
+
     // LiveData for UI state
     private final MutableLiveData<Boolean> isLoading = new MutableLiveData<>(false);
     private final MutableLiveData<String> errorMessage = new MutableLiveData<>();
@@ -36,7 +43,7 @@ public class ProductViewModel extends ViewModel {
     private String searchQuery = "";
     private Long categoryId = null;
     private double minPrice = 0;
-    private double maxPrice = 10000;
+    private double maxPrice = 100000.0; // Default high value to ensure products aren't filtered out
 
     // Sort state
     private boolean sortAscending = true;
@@ -46,6 +53,11 @@ public class ProductViewModel extends ViewModel {
      */
     public ProductViewModel(String token) {
         this.productService = new ProductService(token);
+
+        // Log the initial filter state
+        Log.d("ProductViewModel", "Initializing with filters - query: '" + searchQuery +
+                "', categoryId: " + categoryId +
+                ", price range: " + minPrice + "-" + maxPrice);
     }
 
     // Getters for LiveData
@@ -77,6 +89,24 @@ public class ProductViewModel extends ViewModel {
         return errorMessage;
     }
 
+    // Getters for price range
+    public LiveData<Double> getMinimumProductPrice() {
+        return minimumProductPrice;
+    }
+
+    public LiveData<Double> getMaximumProductPrice() {
+        return maximumProductPrice;
+    }
+
+    // Get current min/max filter prices
+    public double getMinPrice() {
+        return minPrice;
+    }
+
+    public double getMaxPrice() {
+        return maxPrice;
+    }
+
     /**
      * Load all products from API
      */
@@ -86,17 +116,68 @@ public class ProductViewModel extends ViewModel {
         productService.getAllProducts(new ProductCallback<List<Product>>() {
             @Override
             public void onSuccess(List<Product> result) {
+                Log.d("ProductViewModel", "loadProducts success: received " + result.size() + " products");
+
+                // Update products
                 products.setValue(result);
-                applyFilters(); // Apply any active filters
+
+                // Calculate price range from received products
+                updatePriceRangeFromProducts(result);
+
+                // Apply filters with the updated price range
+                applyFilters();
+
                 isLoading.setValue(false);
             }
 
             @Override
             public void onError(String message) {
+                Log.e("ProductViewModel", "loadProducts error: " + message);
                 errorMessage.setValue(message);
                 isLoading.setValue(false);
             }
         });
+    }
+
+    /**
+     * Calculate and update price range based on available products
+     */
+    private void updatePriceRangeFromProducts(List<Product> productList) {
+        if (productList == null || productList.isEmpty()) {
+            // Default values if no products
+            minimumProductPrice.setValue(0.0);
+            maximumProductPrice.setValue(100000.0);
+            return;
+        }
+
+        // Find minimum and maximum prices
+        double minProductPrice = Double.MAX_VALUE;
+        double maxProductPrice = 0.0;
+
+        for (Product product : productList) {
+            double price = product.getPrice();
+            if (price < minProductPrice) {
+                minProductPrice = price;
+            }
+            if (price > maxProductPrice) {
+                maxProductPrice = price;
+            }
+        }
+
+        // Add buffer and round nicely
+        minProductPrice = Math.max(0, Math.floor(minProductPrice * 0.9)); // 10% lower and rounded down
+        maxProductPrice = Math.ceil(maxProductPrice * 1.1); // 10% higher and rounded up
+
+        Log.d("ProductViewModel", "Calculated price range: " + minProductPrice + " - " + maxProductPrice);
+
+        // Update LiveData
+        minimumProductPrice.setValue(minProductPrice);
+        maximumProductPrice.setValue(maxProductPrice);
+
+        // Also update current filter max price if needed
+        if (this.maxPrice < maxProductPrice) {
+            this.maxPrice = maxProductPrice;
+        }
     }
 
     /**
@@ -130,7 +211,8 @@ public class ProductViewModel extends ViewModel {
             @Override
             public void onSuccess(List<Product> result) {
                 products.setValue(result);
-                applyFilters(); // Apply any active filters
+                updatePriceRangeFromProducts(result);
+                applyFilters();
                 isLoading.setValue(false);
             }
 
@@ -152,7 +234,8 @@ public class ProductViewModel extends ViewModel {
             @Override
             public void onSuccess(List<Product> result) {
                 products.setValue(result);
-                applyFilters(); // Apply any active filters
+                updatePriceRangeFromProducts(result);
+                applyFilters();
                 isLoading.setValue(false);
             }
 
@@ -178,7 +261,8 @@ public class ProductViewModel extends ViewModel {
                 if (currentProducts != null) {
                     currentProducts.add(result);
                     products.setValue(currentProducts);
-                    applyFilters(); // Apply any active filters
+                    updatePriceRangeFromProducts(currentProducts);
+                    applyFilters();
                 }
                 isLoading.setValue(false);
             }
@@ -210,7 +294,8 @@ public class ProductViewModel extends ViewModel {
                         }
                     }
                     products.setValue(currentProducts);
-                    applyFilters(); // Apply any active filters
+                    updatePriceRangeFromProducts(currentProducts);
+                    applyFilters();
                 }
                 isLoading.setValue(false);
             }
@@ -237,7 +322,8 @@ public class ProductViewModel extends ViewModel {
                 if (currentProducts != null) {
                     currentProducts.removeIf(product -> product.getProductId() == productId);
                     products.setValue(currentProducts);
-                    applyFilters(); // Apply any active filters
+                    updatePriceRangeFromProducts(currentProducts);
+                    applyFilters();
                 }
                 isLoading.setValue(false);
             }
@@ -279,6 +365,11 @@ public class ProductViewModel extends ViewModel {
         if (currentProducts == null) {
             return;
         }
+
+        // Log filter parameters
+        Log.d("ProductViewModel", "Applying filters - query: '" + searchQuery +
+                "', categoryId: " + categoryId +
+                ", price range: " + minPrice + "-" + maxPrice);
 
         // Apply filters
         List<Product> filtered = productService.filterProducts(

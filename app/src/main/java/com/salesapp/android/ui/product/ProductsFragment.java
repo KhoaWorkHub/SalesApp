@@ -9,6 +9,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
 import android.text.TextWatcher;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -75,7 +76,7 @@ public class ProductsFragment extends Fragment implements ProductAdapter.OnProdu
     // Filter state
     private Long currentCategoryId = null;
     private double minPrice = 0;
-    private double maxPrice = 10000;
+    private double maxPrice = 100000.0;
     private String searchQuery = "";
     private boolean isAscendingSort = true;
 
@@ -201,13 +202,23 @@ public class ProductsFragment extends Fragment implements ProductAdapter.OnProdu
     private void observeViewModel() {
         // Observe products
         viewModel.getFilteredProducts().observe(getViewLifecycleOwner(), products -> {
+            Log.d("ProductsFragment", "Received " + (products != null ? products.size() : 0) + " filtered products");
+
+            // Debug what products we're receiving
+            if (products != null && !products.isEmpty()) {
+                for (Product product : products) {
+                    Log.d("ProductsFragment", "Product in UI: " + product.getProductId() +
+                            " - " + product.getProductName() + ", price: " + product.getPrice());
+                }
+            }
+
             productAdapter.setProducts(products);
 
             // Update result count
             updateResultCount(products.size());
 
             // Show empty view if no products
-            if (products.isEmpty()) {
+            if (products == null || products.isEmpty()) {
                 textViewEmpty.setVisibility(View.VISIBLE);
                 recyclerViewProducts.setVisibility(View.GONE);
             } else {
@@ -224,6 +235,7 @@ public class ProductsFragment extends Fragment implements ProductAdapter.OnProdu
 
         // Observe loading state
         viewModel.getIsLoading().observe(getViewLifecycleOwner(), isLoading -> {
+            Log.d("ProductsFragment", "Loading state changed: " + isLoading);
             if (swipeRefreshLayout.isRefreshing()) {
                 if (!isLoading) {
                     swipeRefreshLayout.setRefreshing(false);
@@ -241,12 +253,36 @@ public class ProductsFragment extends Fragment implements ProductAdapter.OnProdu
         // Observe error messages
         viewModel.getErrorMessage().observe(getViewLifecycleOwner(), errorMessage -> {
             if (errorMessage != null && !errorMessage.isEmpty()) {
+                Log.e("ProductsFragment", "Error loading products: " + errorMessage);
+
+                // Make error more visible to user
+                Toast.makeText(requireContext(), errorMessage, Toast.LENGTH_LONG).show();
+
                 Snackbar.make(requireView(), errorMessage, Snackbar.LENGTH_LONG)
                         .setAction("Retry", v -> {
                             viewModel.clearError();
                             viewModel.loadProducts();
                         })
                         .show();
+            }
+        });
+
+        // Observe price range changes
+        viewModel.getMinimumProductPrice().observe(getViewLifecycleOwner(), minProductPrice -> {
+            Log.d("ProductsFragment", "Minimum product price updated: " + minProductPrice);
+            // Update our local min price if needed
+            if (minPrice < minProductPrice) {
+                minPrice = minProductPrice;
+            }
+        });
+
+        viewModel.getMaximumProductPrice().observe(getViewLifecycleOwner(), maxProductPrice -> {
+            Log.d("ProductsFragment", "Maximum product price updated: " + maxProductPrice);
+            // Update our local max price if needed
+            if (maxPrice < maxProductPrice) {
+                maxPrice = maxProductPrice;
+                // Apply updated price filter
+                viewModel.setFilters(searchQuery, currentCategoryId, minPrice, maxPrice);
             }
         });
     }
@@ -309,13 +345,27 @@ public class ProductsFragment extends Fragment implements ProductAdapter.OnProdu
         Button buttonReset = dialog.findViewById(R.id.buttonReset);
         Button buttonApply = dialog.findViewById(R.id.buttonApply);
 
-        // Set initial values
-        rangeSliderPrice.setValues((float) minPrice, (float) maxPrice);
+        // Get current price range from ViewModel
+        double minProductPrice = viewModel.getMinimumProductPrice().getValue() != null ?
+                viewModel.getMinimumProductPrice().getValue() : 0.0;
+        double maxProductPrice = viewModel.getMaximumProductPrice().getValue() != null ?
+                viewModel.getMaximumProductPrice().getValue() : 100000.0;
 
-        // Format currency
+        // Set slider range
+        rangeSliderPrice.setValueFrom((float) minProductPrice);
+        rangeSliderPrice.setValueTo((float) maxProductPrice);
+
+        // Set current filter values
+        float currentMinPrice = (float) Math.max(minPrice, minProductPrice);
+        float currentMaxPrice = (float) Math.min(maxPrice, maxProductPrice);
+
+        // Set values for the slider
+        rangeSliderPrice.setValues(currentMinPrice, currentMaxPrice);
+
+        // Format currency for display
         NumberFormat currencyFormat = NumberFormat.getCurrencyInstance();
-        textViewMinPrice.setText(currencyFormat.format(minPrice));
-        textViewMaxPrice.setText(currencyFormat.format(maxPrice));
+        textViewMinPrice.setText(currencyFormat.format(currentMinPrice));
+        textViewMaxPrice.setText(currencyFormat.format(currentMaxPrice));
 
         // Set initial sort option
         if (isAscendingSort) {
@@ -333,8 +383,13 @@ public class ProductsFragment extends Fragment implements ProductAdapter.OnProdu
 
         // Setup button click listeners
         buttonReset.setOnClickListener(v -> {
-            rangeSliderPrice.setValues(0f, 10000f);
+            // Reset to maximum range
+            rangeSliderPrice.setValues((float) minProductPrice, (float) maxProductPrice);
             radioGroupSort.check(R.id.radioButtonPriceLowToHigh);
+
+            // Update text displays
+            textViewMinPrice.setText(currencyFormat.format(minProductPrice));
+            textViewMaxPrice.setText(currencyFormat.format(maxProductPrice));
         });
 
         buttonApply.setOnClickListener(v -> {
