@@ -67,9 +67,17 @@ public interface ApiService {
 //    @GET("api/orders/user/{userId}")
 //    Call<List<Order>> getUserOrders(@Path("userId") long userId);
 
-    // Store location endpoints
+    /**
+     * Get all store locations
+     */
     @GET("api/store-locations")
     Call<List<StoreLocation>> getAllStoreLocations();
+
+    /**
+     * Get store location by ID
+     */
+    @GET("api/store-locations/{id}")
+    Call<StoreLocation> getStoreLocationById(@Path("id") long id);
 
     // User endpoints
     @GET("api/users/{id}")

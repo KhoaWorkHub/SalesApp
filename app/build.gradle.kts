@@ -34,6 +34,12 @@ android {
         viewBinding = true
     }
 }
+configurations.all {
+    resolutionStrategy {
+        force ("com.j256.ormlite:ormlite-android:6.1")
+        force ("om.j256.ormlite:ormlite-core:6.1")
+    }
+}
 
 dependencies {
     // Android core
@@ -70,6 +76,10 @@ dependencies {
     implementation("com.airbnb.android:lottie:6.3.0")
 
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
+
+    // Add these to your dependencies in build.gradle
+    implementation ("org.osmdroid:osmdroid-android:6.1.16")
+
 
     // Testing
     testImplementation(libs.junit)
